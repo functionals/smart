@@ -48,7 +48,7 @@ input(_)-->sentence((_),(_)).
 
 
 stream_input:-input(_),!,nl,smart:output.
-stream_input:-(text,vision,sound),!,smart:output.
+stream_input:-(text,sound),!,smart:output.
 stream_input:-[words].
 stream_input:-!,nl,smart:output.
 stream_input:-!,nl,smart:output.
@@ -60,13 +60,14 @@ stream_input:-append((_)|([]|[a])).
 stream_input:-read(_),(assert(_)->[_]).
 stream_input:-smart:input(_)->smart:output(_).
 stream_input:-semantic_input.
+stream_input:-lattice:node(X,Y;Z),parse:parse(X),output:parse(X,Y,Z).
 stream_input:-start.
 
 semantic_input:-(((X),(Y),(Z)),semantic_input(X,Y,Z|(_))).
 semantic_input:-goal((_),(_),(_)).
 semantic_input:-process([_]).
 semantic_input:-sentence.
-semantic_input(Y|X;Z):-((X,Y,Z)|semantic_input(_)).
+semantic_input(Y|X;Z):-output(meaning(X,Y,Z)).
 semantic_input(sentence|(Sentence;Sentence_group))
           :-(Sentence;Sentence_group).
 
@@ -96,17 +97,18 @@ sentence(VP)-->noun_p(Actor),verb_p(Actor,VP).
 sentence(Number, sentence(NP,VP))-->noun_p(Number,NP),verb_p(Number,VP).
 sentence((_),(_))-->noun_p(_).
 l:sentence-->(Number,l:sentence(noun_p,verb_p)),noun_p(Number,verb_p).
-
+l:sentence:-l:letter(form_w,word_p,sentence_group).
 
 
 sentence_group:-(sentence(_)).
-sentence_group:-(semantic_input|sentence).
+sentence_group:-(semantic_input,sentence).
+sentence_group:-output:speech.
 sentence_group-->semantic_input(sentence(_,[])).
 
 
 letter-->[word];[word_p].
 l:letter(X|Y):-form_w((_)|X,Y).
-l:letter(X,Y,Z)-->sentence(X,Z|Y).
+l:letter(word)-->sentence(sentence_group).
 
 
 form_w(_):-sentence.
@@ -166,6 +168,8 @@ parse(P)-->l:sentence(P).
 
 
 parse:parse(input).
+parse:parse(_):-l:sentence.
+parse:parse(D):-lib_dir(D).
 parse:meaning(Vision,Sound,Text):-(meaning(Vision,Sound,Text)).
 parse:output(define(Sound,Vision,Text)):-(stream_input):(Vision,Sound,Text).
 
@@ -190,23 +194,23 @@ text:-sentence(_).
 meaning:define(X,Y,Z):-parse(X,Y,Z).
 
 
-meaning(_):-((parse(Vision,Sound)),(unknown(Vision,Sound))).
+meaning(_):-((parse(text,sound)),unknown(_)).
 meaning((X,Y,Z)):-goal((X,Y,Z)).
 meaning(Y;X;Z):-smart:output(Y;X;Z).
 meaning(P):-output(P).
 meaning(define((X,Y,Z)|P)):-define(meaning((X,Y,Z)|P)).
 
-meaning(question,command):-unknown:input(sound==X,X).
+meaning(question,command):-unknown:input(text).
 meaning(P,Q):-((P-:-Q)),nl,write('definition of'),nl,display(P),nl,write('is'),nl,display(Q),merge((P),(Q),[words]).
-meaning(human,non_human):-(unknown:(input(vision==Y,Y))).
-meaning(english,formal):-(unknown:(input(text==Z,Z))).
+meaning(human,non_human):-unknown:(input(sound)).
+meaning(english,formal):-unknown:(input(text)).
 
 meaning(X,Y,Z):-define(X,Y,Z),call([words]).
 meaning(X,Y,Z|Sentence;Sentence_group):-(semantic_input(Y|X;Z),(Sentence,Sentence_group)).
 meaning(P)-->smart:output(P).
 meaning(X,Y,Z):-semantic_input(X,Y,Z).
 meaning(X,Y,Z):-parse(X,Y,Z).
-meaning(X,Y,Z):-(parse:(definition(X,X,Y,Y,Z,Z))).
+meaning(X,Y,Z):-(parse:definition(input(X,Y,Z))).
 meaning(X,Y,Z):-learn(meaning(X,Y,Z)).
 
 
@@ -215,7 +219,7 @@ copy_list([]-:-[]).
 copy_list([X|Y]-:-[X|Z]):-copy_list(Y-:-Z),tell([hWai]).
 
 
-define((X,Y,Z)|P):-output(X,Y,Z)|(P).
+define((X,Y,Z)|P):-output(X,Y,Z),(P).
 define(P):-meaning(P).
 define((_)|P):-goal(P).
 define(Sound=(X)):-(unknown:input(Sound=(X)),(parse(X))).
@@ -238,14 +242,14 @@ analyze(task):-calculate(task).
 learn(meaning(Vision,Sound,Text)):-parse:meaning(Vision,Sound,Text).
 
 
-question:-((Sentence|Sentence_group),((Sentence),(Sentence_group))).
+question:-((Sentence;Sentence_group),((Sentence),(Sentence_group))).
 question:-smart:output.
 
-command:-((Sentence|Sentence_group),(Sentence;Sentence_group),stream_input).
+command:-((Sentence;Sentence_group),(Sentence;Sentence_group),stream_input).
 command:-(smart:output).
 idea:-(question,command).
 goal((X,Y,Z)|P):-output((X,Y,Z)|P).
-goal(P):-unknown(X,Y,Z),(parse((X,Y,Z)|P):-unknown(X,Y,Z)).
+goal(P):-unknown(X,Y,Z),(parse((X,Y,Z)|P)).
 goal(X,Y,Z):-define(X,Y,Z).
 
 
@@ -253,7 +257,7 @@ goal(X,Y,Z):-define(X,Y,Z).
 
 output(_):-stream_input->smart:output.
 output(P):-meaning(P).
-output((X,Y,Z)|P):-output(meaning(X,Y,Z),(define(X,Y,Z)))|P.
+output((X,Y,Z)|P):-output(meaning(X,Y,Z),(define(X,Y,Z))),P.
 output(P):-goal(P).
 output(meaning(X,Y,Z),(define(X,Y,Z)|interpretation(P))):-output(X,Y,Z|P).
 output(sentence)-->(sentence_group).
@@ -266,7 +270,7 @@ output:speech:-analyze(task).
 
 smart(analyze(task)).
 smart(analyze(task)):-smart:input(_)->smart:output.
-
+smart(analyze(X;Y;Z)):-meaning:define(X,Y,Z).
 
 smart:input(W):-speech:output(form_w(X),(W|X)).
 smart:input(_):-input(_).
@@ -411,8 +415,7 @@ lattice:matrix(node(A,B,C)):-lattice:node(d(_)),A,B,C.
 lattice:matrix(Close):-set_random(number(Close)).
 lattice:matrix(((Number))):-pass,pass(_),lattice:node(Number).
 lattice:matrix(X):-random(X).
-lattice:matrix(_):- else.
-lattice:matrix((set_random(Number))):-lattice:edges(3)->random(Number).
+lattice:matrix((set_random(Number))):-lattice:edge(3)->random(Number).
 lattice:matrix((Number)):-(lattice:node(3)->lattice:node(Number)).
 lattice:matrix((Prime)):-number(Prime).
 lattice:matrix(~(pass)):-[_].
@@ -420,7 +423,7 @@ lattice:matrix(pass):-pass.
 
 
 lattice:matrix(Line,Node,Distance):-lattice:edge(Line);Node,Distance.
-lattice:matrix(X,Y,Z):-lattice:edge(X,Y,Z),lattice:egde(Y,A,B),lattice:edge(Z,A,B),lattice:node(X,Y,Z).
+lattice:matrix(X,Y,Z):-lattice:edge(X,Y,Z),lattice:edge(Y,A,B),lattice:edge(Z,A,B),lattice:node(X,Y,Z).
 lattice:matrix(Line,Node,Distance):-lattice:edge(Line)->lattice:edge(Line,Node,Distance).
 lattice:matrix(node(1),node(2),node(3)):-lattice:node(d(_)).
 lattice:matrix(Prime1,Prime2,Prime3):-lattice:node(Prime1,Prime2,Prime3).
@@ -461,6 +464,7 @@ lattice:node(d([A+1=B])):-A,B.
 lattice:node(d([A+2=C])):-A,C.
 lattice:node(d([B+1=C])):-B,C.
 lattice:node(d([A+B=C])):-A,B,C.
+lattice:node(Triple_prime):-number(Triple_prime).
 lattice:node(Prime,X):- 0 is X mod X+1,not(Prime),!.
 lattice:node(X,Y,Z):-node(X,Y,Z).
 lattice:node(Prime1,Prime2,Prime3):-lattice:edge(Prime1,Prime2,Prime3).
@@ -469,7 +473,6 @@ lattice:node(X,Y,Z):-node(X,Y,Z)->lattice:node((1/X,X,(_))).
 
 lattice:node(Prime1,Prime2,Prime3):-set_random(pass),pass->[Prime1,Prime2,Prime3].
 lattice:node(Triple_prime,Triple_prime,Triple_prime):-set_random(pass),pass->number(Triple_prime).
-lattice:node(Prime1,Prime2,Prime3):-lattice:number(Prime1,Prime2,Prime3).
 lattice:node(Prime1,Prime2,Prime3):-lattice:distance(Prime1,Prime2,Prime3).
 lattice:node(X,Y,Z,Q):-node(Prime1,Prime2,Prime3)->(X;Prime1),(Y;Prime2),(Z;Prime3);Q.
 lattice:node(X,Y,Z,A,_):-lattice:node(X,Y,Z,A).
@@ -493,7 +496,7 @@ lattice:min(Bound,BF,Bound1):-lattice:min(Bound,BF,Bound1).
 
 
 '$dde_connect'(lattice:matrix):-handle_request(pass).
-'$dde_connect'(lattice:matrix):- if(current_predicate(open_dde_conversation/3)).
+
 
 :- module(emacs_dde_server).
 :- module(emacs_dde_server),module(win_register_emacs).
@@ -531,6 +534,9 @@ source_file_chain(Ch):-pass(Ch),pass.
 user_source_file(F) :-
 	source_file(F),
 	\+ (lib_dir(D), atom_concat(D, _, F)).
+user_source_file(source_file(Z)):-lib_dir(Z),expand_path(Z,source_file(Z)),ignore_paths_from(Y),expand_path(X,Z),smart:analyze(X),user_source_file(Y).
+user_source_file(_):-pass:start.
+
 
 ignore_paths_from(library).
 ignore_paths_from(pce_boot).
@@ -540,6 +546,8 @@ lib_dir(D) :-
 	user:file_search_path(Category, X),
 	expand_path(X, D0),
 	absolute_file_name(D0, D).	% canonise
+lib_dir(D):-user_source_file(D).
+
 
 expand_path(X, X) :-
 	atomic(X), !.
