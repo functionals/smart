@@ -14,6 +14,7 @@ start:-
 	nl,
 	read(A),
 	assert(A),
+	define(A),
 	nl,
 	display(A),
 	nl,
@@ -50,7 +51,6 @@ input(_)-->sentence((_),(_)).
 stream_input:-input(_),!,nl,smart:output.
 stream_input:-(text,sound),!,smart:output.
 stream_input:-[words].
-stream_input:-!,nl,smart:output.
 stream_input:-!,nl,smart:output.
 stream_input:-(semantic_input(X)->stream_input:(X)).
 stream_input:-semantic_input(_).
